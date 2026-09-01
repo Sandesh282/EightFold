@@ -1,0 +1,53 @@
+# ─── Secrets — NEVER commit ───────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+backend/.env
+
+# ─── Node ─────────────────────────────────────────────────────────────────────
+node_modules/
+dist/
+dist-ssr/
+
+# ─── Python ───────────────────────────────────────────────────────────────────
+backend/venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.eggs/
+*.egg
+.pytest_cache/
+.mypy_cache/
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ─── OS junk ──────────────────────────────────────────────────────────────────
+.DS_Store
+**/.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ─── Editors ──────────────────────────────────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+
+# ─── Misc ─────────────────────────────────────────────────────────────────────
+*.local
+coverage/
+.nyc_output/
