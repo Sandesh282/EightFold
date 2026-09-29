@@ -11,15 +11,15 @@ A separate **Python FastAPI backend** accepts a resume PDF/DOCX upload alongside
 ## Architecture
 
 ```
-                                          ┌─────────────────────────────────┐
+                                          ┌──────────────────────────────────┐
 React Frontend (Vite + Tailwind)          │   Python Backend (separate)      │
-─────────────────────────────────         │─────────────────────────────────│
+─────────────────────────────────         │──────────────────────────────────│
 GitHub API  ──┐                           │ Resume PDF/DOCX                  │
-              ├──► Gemini AI             │   └─► PyMuPDF / python-docx      │
-Codeforces ──┘     └─► Analysis UI       │         └─► Gemini AI            │
+              ├──► Gemini AI              │   └─► PyMuPDF / python-docx      │
+Codeforces ───┘     └─► Analysis UI       │         └─► Gemini AI            │
                                           │               └─► Streamlit      │
                                           │                   Dashboard      │
-                                          └─────────────────────────────────┘
+                                          └──────────────────────────────────┘
 
 Data flow (frontend):
   1. User enters GitHub username + Codeforces handle + job description
