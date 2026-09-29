@@ -1,6 +1,6 @@
 # EightFold
 
-AI-powered candidate screening tool that verifies real engineering skills using live GitHub and Codeforces data — before the first interview.
+AI-powered candidate screening tool that verifies real engineering skills using live GitHub and Codeforces data -- before the first interview.
 
 ## What it does
 
