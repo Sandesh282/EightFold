@@ -1,3 +1,4 @@
+import { AppError } from "../errors";
 import type { CodeforcesData } from "../types";
 import { computeRatingConsistency } from "./genuineness";
 
@@ -6,10 +7,11 @@ export { computeRatingConsistency } from "./genuineness";
 
 export async function fetchCodeforcesData(handle: string): Promise<CodeforcesData> {
   const infoRes = await fetch(`https://codeforces.com/api/user.info?handles=${handle}`);
-  if (!infoRes.ok) throw new Error(`Codeforces handle "${handle}" not found or API unavailable.`);
+  if (!infoRes.ok)
+    throw new AppError("CODEFORCES_API_ERROR", `Codeforces API unavailable (HTTP ${infoRes.status}). Try again in a moment.`);
   const infoData = await infoRes.json();
   if (infoData.status !== "OK")
-    throw new Error(infoData.comment || `Codeforces handle "${handle}" not found or API unavailable.`);
+    throw new AppError("CODEFORCES_USER_NOT_FOUND", infoData.comment || `Codeforces handle "${handle}" not found.`);
 
   const user = infoData.result[0];
 

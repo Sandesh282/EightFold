@@ -1,16 +1,48 @@
-const BASE = "https://api.github.com";
-const token = import.meta.env.VITE_GITHUB_TOKEN as string | undefined;
-const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-
+import { AppError } from "../errors";
 import type { GitHubData } from "../types";
 
-async function ghFetch(url: string, useAuth = true): Promise<Response> {
-  const res = await fetch(url, { headers: useAuth ? authHeaders : {} });
-  if (res.status === 401 && useAuth) return ghFetch(url, false);
+const BASE = "https://api.github.com";
+const token = import.meta.env.VITE_GITHUB_TOKEN as string | undefined;
+const authHeaders: Record<string, string> = token
+  ? { Authorization: `Bearer ${token}` }
+  : {};
+
+// ─── Core fetch wrapper ───────────────────────────────────────────────────────
+
+async function ghFetch(url: string): Promise<Response> {
+  const res = await fetch(url, { headers: authHeaders });
+
+  if (res.status === 401) {
+    throw new AppError(
+      "GITHUB_TOKEN_INVALID",
+      token
+        ? "GitHub token is invalid or revoked. Generate a new one at github.com/settings/tokens."
+        : "GitHub API returned 401 with no token present."
+    );
+  }
+
+  if (res.status === 403) {
+    // GitHub returns 403 for two distinct reasons:
+    // 1. Primary rate limit exceeded (X-RateLimit-Remaining: 0)
+    // 2. Secondary / abuse rate limit (concurrent request burst)
+    const remaining = res.headers.get("X-RateLimit-Remaining");
+    if (remaining === "0") {
+      throw new AppError(
+        "GITHUB_RATE_LIMIT",
+        "GitHub primary rate limit exhausted. The app will work again when the limit resets (usually within an hour)."
+      );
+    }
+    throw new AppError(
+      "GITHUB_ABUSE_DETECTED",
+      "GitHub secondary rate limit triggered. This is caused by sending too many requests at once. The app serializes requests now to prevent this — if it happens again, wait 60 seconds and retry."
+    );
+  }
+
   return res;
 }
 
-// Common frameworks/libraries to look for in dependency files
+// ─── Tech stack detection ─────────────────────────────────────────────────────
+
 const KNOWN_TECH = [
   "react", "vue", "angular", "next", "nuxt", "svelte",
   "express", "fastapi", "django", "flask", "spring", "nestjs", "hono",
@@ -23,23 +55,32 @@ const KNOWN_TECH = [
   "tensorflow", "pytorch", "scikit-learn", "pandas", "numpy",
 ];
 
+const DEP_FILES = ["package.json", "requirements.txt", "go.mod", "pom.xml", "Cargo.toml"];
+
+/**
+ * Fetch dependency files for ONE repo SEQUENTIALLY to avoid triggering
+ * GitHub's abuse rate limits (which fire on concurrent bursts).
+ * GitHub's own best-practice docs say: "Do not make requests concurrently."
+ */
 async function fetchDeps(owner: string, repo: string): Promise<string[]> {
-  const files = ["package.json", "requirements.txt", "go.mod", "pom.xml", "Cargo.toml"];
-  const results = await Promise.all(
-    files.map(f =>
-      ghFetch(`${BASE}/repos/${owner}/${repo}/contents/${f}`)
-        .then(r => (r.ok ? r.json() : null))
-        .catch(() => null)
-    )
-  );
   const found = new Set<string>();
-  for (const file of results) {
-    if (!file?.content) continue;
-    const content = atob(file.content.replace(/\n/g, "")).toLowerCase();
-    for (const tech of KNOWN_TECH) {
-      if (content.includes(`"${tech}"`) || content.includes(tech)) found.add(tech);
+
+  for (const file of DEP_FILES) {
+    try {
+      const res = await ghFetch(`${BASE}/repos/${owner}/${repo}/contents/${file}`);
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (!data?.content) continue;
+      const content = atob(data.content.replace(/\n/g, "")).toLowerCase();
+      for (const tech of KNOWN_TECH) {
+        if (content.includes(`"${tech}"`) || content.includes(tech)) found.add(tech);
+      }
+    } catch {
+      // 404 means the file doesn't exist in this repo — that's fine, skip silently.
+      continue;
     }
   }
+
   return [...found];
 }
 
@@ -48,22 +89,23 @@ async function fetchLangBytes(owner: string, repo: string): Promise<Record<strin
   return res.ok ? res.json() : {};
 }
 
+// ─── Main export ──────────────────────────────────────────────────────────────
+
 export async function fetchGitHubData(username: string): Promise<GitHubData> {
+  // These three can run concurrently — they are distinct resources, not a burst on one.
   const [userRes, reposRes, eventsRes] = await Promise.all([
     ghFetch(`${BASE}/users/${username}`),
     ghFetch(`${BASE}/users/${username}/repos?per_page=100&sort=updated`),
     ghFetch(`${BASE}/users/${username}/events/public?per_page=100`),
   ]);
 
-  if (userRes.status === 403)
-    throw new Error("GitHub API rate limit hit. Add a valid VITE_GITHUB_TOKEN in .env to fix this.");
   if (userRes.status === 404)
-    throw new Error(`GitHub username "${username}" not found.`);
+    throw new AppError("GITHUB_USER_NOT_FOUND", `GitHub username "${username}" not found.`);
   if (!userRes.ok)
-    throw new Error(`GitHub error (${userRes.status}). Check your inputs.`);
+    throw new AppError("GITHUB_API_ERROR", `GitHub error (${userRes.status}). Check your inputs.`);
 
   const user = await userRes.json();
-  const repos = await reposRes.json();
+  const repos = reposRes.ok ? await reposRes.json() : [];
   const events = eventsRes.ok ? await eventsRes.json() : [];
 
   // Language frequency by repo count
@@ -82,26 +124,29 @@ export async function fetchGitHubData(username: string): Promise<GitHubData> {
     .sort((a: { stargazers_count: number }, b: { stargazers_count: number }) => b.stargazers_count - a.stargazers_count)
     .slice(0, 3);
 
-  // Fetch language bytes + deps for top 3 repos in parallel
-  const [langBytesResults, depsResults] = await Promise.all([
-    Promise.all(top3.map((r: { name: string }) => fetchLangBytes(username, r.name))),
-    Promise.all(top3.map((r: { name: string }) => fetchDeps(username, r.name))),
-  ]);
-
-  // Merge language bytes across top 3
+  // ─── Phase 3: Serialize all per-repo deep-scan calls ─────────────────────
+  // Running these concurrently (as before) fires 18 requests at once and
+  // triggers GitHub's abuse rate limiter. We now run them one repo at a time.
   const totalBytes: Record<string, number> = {};
-  for (const lb of langBytesResults) {
-    for (const [lang, bytes] of Object.entries(lb as Record<string, number>)) {
+  const allDeps: string[][] = [];
+
+  for (const repo of top3 as { name: string }[]) {
+    const [langBytes, deps] = await Promise.all([
+      fetchLangBytes(username, repo.name),  // 1 request — safe to run alongside deps
+      fetchDeps(username, repo.name),        // ≤5 sequential requests internally
+    ]);
+    for (const [lang, bytes] of Object.entries(langBytes as Record<string, number>)) {
       totalBytes[lang] = (totalBytes[lang] || 0) + bytes;
     }
+    allDeps.push(deps);
   }
+
   const languageBytes = Object.entries(totalBytes)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8)
     .map(([lang, bytes]) => ({ lang, bytes }));
 
-  // Deduplicate detected frameworks across all repos
-  const detectedTech = [...new Set((depsResults as string[][]).flat())];
+  const detectedTech = [...new Set(allDeps.flat())];
 
   // Activity from events (last 90 days)
   const pushes = events.filter((e: { type: string }) => e.type === "PushEvent").length;

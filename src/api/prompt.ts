@@ -34,14 +34,14 @@ You are an expert technical hiring assistant. Perform a deep analysis of this ca
 ${jobDescription}
 
 ## Instructions
-Extract every distinct skill/technology/requirement from the job description. For each one, compute a cosine similarity score (0.0–1.0) representing how strongly the candidate's evidence matches that requirement.
+Extract every distinct skill/technology/requirement from the job description. For each one, produce an alignment score (0.0–1.0) representing how strongly the candidate's **observed public evidence** supports that requirement. This is an evidence-based estimate, not a vector similarity computation.
 
 Return ONLY a valid JSON object with this exact shape:
 {
   "score": <overall 0-100>,
   "label": <"Strong Match" | "Good Match" | "Partial Match" | "Weak Match">,
   "skillSimilarity": [
-    { "skill": "<skill name>", "score": <0.0-1.0>, "status": <"verified"|"learnable"|"missing">, "evidence": "<one line of evidence from their profile>" }
+    { "skill": "<requirement name>", "score": <0.0-1.0>, "status": <"observed"|"partial"|"not-found">, "evidence": "<one line: what public evidence was observed, or 'No public evidence found'>" }
   ],
   "dimensions": {
     "githubActivity": { "score": <0-100>, "summary": "<one line>" },
@@ -52,10 +52,10 @@ Return ONLY a valid JSON object with this exact shape:
   },
   "strengths": ["<strength 1>", "<strength 2>", "<strength 3>"],
   "weaknesses": ["<weakness 1>", "<weakness 2>"],
-  "redFlags": ["<red flag if any, else empty array>"],
+  "redFlags": ["<concern if any, else empty array>"],
   "hiringRecommendation": <"Strong Hire" | "Hire" | "Maybe" | "No Hire">,
-  "learningPrediction": "<e.g. Estimated time to become job-ready: 2–4 weeks>",
-  "aiInsight": "<3-4 sentence detailed explanation covering strengths, gaps, and hiring rationale>"
+  "learningPrediction": "<Estimated ramp-up time to become productive in this role, e.g. '2–4 weeks'>",
+  "aiInsight": "<3-4 sentence synthesis covering what the evidence shows, gaps, and hiring rationale>"
 }
 `;
 }

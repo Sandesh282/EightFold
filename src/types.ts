@@ -55,13 +55,20 @@ export interface RatingHistoryEntry {
   date: string;
 }
 
-export type RatingConsistency =
-  | "Expert level"
-  | "Genuine"
-  | "Likely genuine"
-  | "Questionable"
-  | "Suspicious"
+/**
+ * Deterministic heuristic signal — based on rating vs. average problem difficulty,
+ * contest count, and recent rating spike detection. Does NOT imply cheating.
+ */
+export type RatingConsistencySignal =
+  | "Expert-level rating"
+  | "Consistent"
+  | "Likely consistent"
+  | "Low evidence"
+  | "Inconsistent"
   | "N/A";
+
+/** @deprecated Use RatingConsistencySignal */
+export type RatingConsistency = RatingConsistencySignal;
 
 export interface CodeforcesData {
   rating: number;
@@ -76,7 +83,7 @@ export interface CodeforcesData {
   difficultyDistribution: DifficultyBucket[];
   avgDifficulty: number;
   hardestProblem: number;
-  ratingConsistency: RatingConsistency;
+  ratingConsistency: RatingConsistencySignal;
   ratingHistory: RatingHistoryEntry[];
   verdicts: { accepted: number; wrongAnswer: number; tle: number };
   contribution: number;
@@ -84,14 +91,25 @@ export interface CodeforcesData {
 
 // ─── Gemini Analysis ─────────────────────────────────────────────────────────
 
-export type SkillStatus = "verified" | "learnable" | "missing";
+/**
+ * observed   = found in public GitHub repos/deps
+ * partial    = some evidence; may need to be built on the job
+ * not-found  = no public evidence observed
+ */
+export type SkillStatus = "observed" | "partial" | "not-found";
 
-export interface SkillSimilarity {
+/** Per-requirement alignment score produced by AI synthesis */
+export interface RequirementAlignment {
   skill: string;
+  /** 0.0–1.0 alignment score from AI synthesis — not a vector cosine similarity */
   score: number;
   status: SkillStatus;
+  /** One-line description of what public evidence was observed */
   evidence: string;
 }
+
+/** @deprecated Use RequirementAlignment */
+export type SkillSimilarity = RequirementAlignment;
 
 export interface DimensionScore {
   score: number;
@@ -112,12 +130,14 @@ export type HiringRecommendation = "Strong Hire" | "Hire" | "Maybe" | "No Hire";
 export interface GeminiAnalysis {
   score: number;
   label: HiringLabel;
-  skillSimilarity: SkillSimilarity[];
+  /** @see RequirementAlignment — scores are AI alignment estimates, not cosine similarity */
+  skillSimilarity: RequirementAlignment[];
   dimensions: AnalysisDimensions;
   strengths: string[];
   weaknesses: string[];
   redFlags: string[];
   hiringRecommendation: HiringRecommendation;
+  /** AI-generated ramp-up estimate — an LLM opinion, not a predictive model */
   learningPrediction: string;
   aiInsight: string;
 }

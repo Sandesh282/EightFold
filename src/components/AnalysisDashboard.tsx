@@ -13,11 +13,11 @@ const LANG_COLORS = ["#6366f1", "#06b6d4", "#10b981", "#f59e0b", "#ec4899"];
 const DIFF_COLORS = ["#6366f1", "#06b6d4", "#10b981", "#f59e0b", "#f97316", "#ef4444", "#ec4899"];
 
 const consistencyBadgeClass: Record<string, string> = {
-  Genuine: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
-  "Expert level": "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
-  "Likely genuine": "bg-cyan-500/20 text-cyan-300 border-cyan-500/30",
-  Questionable: "bg-amber-500/20 text-amber-300 border-amber-500/30",
-  Suspicious: "bg-red-500/20 text-red-300 border-red-500/30",
+  "Expert-level rating": "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+  Consistent: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+  "Likely consistent": "bg-cyan-500/20 text-cyan-300 border-cyan-500/30",
+  "Low evidence": "bg-amber-500/20 text-amber-300 border-amber-500/30",
+  Inconsistent: "bg-red-500/20 text-red-300 border-red-500/30",
 };
 
 export function AnalysisDashboard({ data }: AnalysisDashboardProps) {

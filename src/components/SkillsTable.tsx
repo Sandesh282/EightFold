@@ -7,9 +7,9 @@ interface SkillsTableProps {
 }
 
 export function SkillsTable({ skillSimilarity }: SkillsTableProps) {
-  const verified = skillSimilarity.filter(s => s.status === "verified");
-  const learnable = skillSimilarity.filter(s => s.status === "learnable");
-  const missing = skillSimilarity.filter(s => s.status === "missing");
+  const observed = skillSimilarity.filter(s => s.status === "observed");
+  const partial = skillSimilarity.filter(s => s.status === "partial");
+  const notFound = skillSimilarity.filter(s => s.status === "not-found");
 
   return (
     <div className="space-y-5">
@@ -19,9 +19,9 @@ export function SkillsTable({ skillSimilarity }: SkillsTableProps) {
         <div className="space-y-4">
           {(
             [
-              ["verified", "Verified", verified],
-              ["learnable", "Learnable", learnable],
-              ["missing", "Missing", missing],
+              ["observed", "Observed in public repos", observed],
+              ["partial", "Partial evidence", partial],
+              ["not-found", "No public evidence", notFound],
             ] as const
           ).map(([type, labelText, items]) => (
             <div key={type}>
@@ -39,7 +39,7 @@ export function SkillsTable({ skillSimilarity }: SkillsTableProps) {
 
       {/* Per-skill similarity scores */}
       <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-xl">
-        <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">Skill Match Scores</h3>
+        <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">Requirement Alignment</h3>
         <div className="space-y-3">
           {skillSimilarity.map(s => (
             <div key={s.skill}>
@@ -52,9 +52,9 @@ export function SkillsTable({ skillSimilarity }: SkillsTableProps) {
                   className="h-1.5 rounded-full transition-all duration-700"
                   style={{
                     width: `${s.score * 100}%`,
-                    background: s.status === "verified"
+                    background: s.status === "observed"
                       ? "#10b981"
-                      : s.status === "learnable"
+                      : s.status === "partial"
                       ? "#f59e0b"
                       : "#ef4444",
                   }}
@@ -73,9 +73,9 @@ export function SkillsTable({ skillSimilarity }: SkillsTableProps) {
         <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">Skill Match Overview</h3>
         <BarChart
           items={[
-            { label: "Verified", value: verified.length },
-            { label: "Learnable", value: learnable.length },
-            { label: "Missing", value: missing.length },
+            { label: "Observed", value: observed.length },
+            { label: "Partial", value: partial.length },
+            { label: "Not found", value: notFound.length },
           ]}
           colors={["#10b981", "#f59e0b", "#ef4444"]}
         />

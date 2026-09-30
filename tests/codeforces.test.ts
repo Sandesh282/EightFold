@@ -6,23 +6,23 @@ import { computeRatingConsistency } from "../src/api/genuineness";
  *
  * Algorithm signals:
  *  - rating >= 2500 → "Expert level" (bypass all heuristics)
- *  - (rating - avgDifficulty) > 500  OR spike > 300 in last 5 OR (contests < 10 AND rating > 1600) → "Suspicious"
- *  - (rating - avgDifficulty) > 300 → "Questionable"
- *  - |rating - avgDifficulty| < 250  → "Genuine"
- *  - otherwise → "Likely genuine"
+ *  - (rating - avgDifficulty) > 500  OR spike > 300 in last 5 OR (contests < 10 AND rating > 1600) → "Inconsistent"
+ *  - (rating - avgDifficulty) > 300 → "Low evidence"
+ *  - |rating - avgDifficulty| < 250  → "Consistent"
+ *  - otherwise → "Likely consistent"
  */
 
 const mkHistory = (changes: number[]) => changes.map(c => ({ change: c }));
 
 describe("computeRatingConsistency", () => {
-  it("flags low-contest + high-rating as Suspicious", () => {
+  it("flags low-contest + high-rating as Inconsistent", () => {
     // contestCount=8 (<10), rating=1800 (>1600) → lowContestHighRating = true
     const result = computeRatingConsistency({
       currentRating: 1800,
       avgDifficulty: 900,
       ratingHistory: mkHistory(Array(8).fill(50)), // 8 contests, no spike
     });
-    expect(result).toBe("Suspicious");
+    expect(result).toBe("Inconsistent");
   });
 
   it("returns Genuine for well-calibrated profile", () => {
@@ -32,7 +32,7 @@ describe("computeRatingConsistency", () => {
       avgDifficulty: 1300,
       ratingHistory: mkHistory(Array(20).fill(40)),
     });
-    expect(result).toBe("Genuine");
+    expect(result).toBe("Consistent");
   });
 
   it("returns Expert level for rating >= 2500", () => {
@@ -41,10 +41,10 @@ describe("computeRatingConsistency", () => {
       avgDifficulty: 900, // would be Suspicious otherwise
       ratingHistory: mkHistory([]),
     });
-    expect(result).toBe("Expert level");
+    expect(result).toBe("Expert-level rating");
   });
 
-  it("flags sudden spike > 300 in last 5 contests as Suspicious", () => {
+  it("flags sudden spike > 300 in last 5 contests as Inconsistent", () => {
     // Last 5 include a +350 spike
     const history = [...Array(15).fill(0).map(() => ({ change: 30 })), { change: 350 }];
     const result = computeRatingConsistency({
@@ -52,7 +52,7 @@ describe("computeRatingConsistency", () => {
       avgDifficulty: 1600,
       ratingHistory: history,
     });
-    expect(result).toBe("Suspicious");
+    expect(result).toBe("Inconsistent");
   });
 
   it("returns Questionable when rating exceeds avg difficulty by 301–500", () => {
@@ -62,7 +62,7 @@ describe("computeRatingConsistency", () => {
       avgDifficulty: 1550,
       ratingHistory: mkHistory(Array(20).fill(40)),
     });
-    expect(result).toBe("Questionable");
+    expect(result).toBe("Low evidence");
   });
 
   it("returns Likely genuine for moderate mismatch", () => {
@@ -72,7 +72,7 @@ describe("computeRatingConsistency", () => {
       avgDifficulty: 1500,
       ratingHistory: mkHistory(Array(20).fill(40)),
     });
-    expect(result).toBe("Likely genuine");
+    expect(result).toBe("Likely consistent");
   });
 
   it("returns N/A when rating is 0", () => {

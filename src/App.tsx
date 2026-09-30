@@ -5,6 +5,7 @@ import { fetchCodeforcesData } from "./api/codeforces";
 import { analyzeWithGemini } from "./api/gemini";
 import { InputPanel } from "./components/InputPanel";
 import { AnalysisDashboard } from "./components/AnalysisDashboard";
+import { AppError } from "./errors";
 import type { FormState, AnalysisResult } from "./types";
 
 const IS_DEMO_MODE =
@@ -19,17 +20,36 @@ const DEMO_STEPS = [
 ];
 
 function parseApiError(e: unknown): string {
-  const msg = (e as Error)?.message || "";
-
-  if (msg.includes("rate limit") || msg.includes("403"))
-    return 'GitHub API rate limit hit. Add a VITE_GITHUB_TOKEN in your .env to fix this.';
-  if (msg.includes("not found") && msg.toLowerCase().includes("github"))
-    return msg; // already human-readable from github.ts
-  if (msg.toLowerCase().includes("codeforces"))
-    return msg; // already human-readable from codeforces.ts
-  if (msg.includes("429"))
-    return "Gemini API quota exceeded. Try again in a moment.";
-  return "Analysis failed. Check your API keys and try again.";
+  if (e instanceof AppError) {
+    switch (e.code) {
+      case "GITHUB_TOKEN_INVALID":
+        return "GitHub token is invalid or revoked. Generate a new one at github.com/settings/tokens.";
+      case "GITHUB_RATE_LIMIT":
+        return "GitHub rate limit hit. Add a VITE_GITHUB_TOKEN in your .env — this raises the limit to 5,000 req/hr.";
+      case "GITHUB_ABUSE_DETECTED":
+        return "GitHub abuse rate limit triggered. The app now sends requests serially to prevent this. Wait 60 seconds and try again.";
+      case "GITHUB_USER_NOT_FOUND":
+        return e.message;
+      case "GITHUB_API_ERROR":
+        return e.message;
+      case "CODEFORCES_USER_NOT_FOUND":
+        return e.message;
+      case "CODEFORCES_API_ERROR":
+        return "Codeforces API is temporarily unavailable. Try again in a moment.";
+      case "GEMINI_TOKEN_INVALID":
+        return "Gemini API key is invalid or revoked. Generate a new key at aistudio.google.com.";
+      case "GEMINI_QUOTA_EXCEEDED":
+        return "Gemini API quota exhausted. The app tried all fallback models. Wait a few minutes and try again.";
+      case "GEMINI_SERVICE_UNAVAILABLE":
+        return "Gemini servers are temporarily overloaded (503). This is a Google issue — please wait 30 seconds and retry.";
+      case "GEMINI_BAD_RESPONSE":
+        return "Gemini returned an unexpected response. Please try again.";
+      default:
+        return e.message || "An unexpected error occurred.";
+    }
+  }
+  // Fallback for non-AppError exceptions (e.g. JSON.parse failures)
+  return (e as Error)?.message || "An unexpected error occurred.";
 }
 
 export default function App() {
